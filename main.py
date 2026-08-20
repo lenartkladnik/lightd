@@ -2,6 +2,10 @@ from controllers import BilresaController, LightsStatus
 from web import Web, WifiConfig
 from weather import get_weather
 import uasyncio
+import machine
+
+led = machine.Pin("LED", machine.Pin.OUT)
+led.on()
 
 with open(".config", "r") as f:
     config = dict([i.split("=") for i in f.read().splitlines()])
@@ -16,6 +20,8 @@ app = Web(wifi_conf)
 bilresa.brightness_down(20) # Ensure brightness is 0
 bilresa.lights_status.brightness_level = 0
 print("Please set the warmth to the warmest tone.") # Assuming warmth is the warmest
+
+led.off()
 
 async def update_lights():
     w = get_weather()
