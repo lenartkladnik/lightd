@@ -83,6 +83,7 @@ class BilresaController:
         if diff >= self.brightness_change_press_duration:
             # Long press
             self.lights_status.change_brightness(int((diff - self.brightness_change_press_duration) / self.brightness_change_rate))
+            self._already_pressed_once = False
             return
 
         if self._already_pressed_once:
@@ -93,7 +94,7 @@ class BilresaController:
 
         self._already_pressed_once = True
 
-        def try_single_press():
+        def try_single_press(_):
             if self._already_pressed_once:
                 self._already_pressed_once = False
                 # Single press
@@ -107,6 +108,7 @@ class BilresaController:
         if diff >= self.brightness_change_press_duration:
             # Long press
             self.lights_status.change_brightness(-int((diff - self.brightness_change_press_duration) / self.brightness_change_rate))
+            self._already_pressed_once = False
             return
 
         if self._already_pressed_once:
@@ -117,7 +119,7 @@ class BilresaController:
 
         self._already_pressed_once = True
 
-        def try_single_press():
+        def try_single_press(_):
             if self._already_pressed_once:
                 self._already_pressed_once = False
                 # Single press
