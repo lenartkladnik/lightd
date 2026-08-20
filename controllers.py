@@ -18,6 +18,9 @@ class LightsStatus:
         self.color_range: range = color_range
         self.on: bool = on
 
+    def __repr__(self) -> str:
+        return f"{{\n\t{self.brightness_level=},\n\t{self.brightness_range=},\n\t{self.color_level=},\n\t{self.color_range=},\n\t{self.on=}\n}}"
+
     def change_brightness(self, n: int):
         if self.on:
             self.brightness_level += n
