@@ -19,11 +19,13 @@ class LightsStatus:
         self.on: bool = on
 
     def __repr__(self) -> str:
-        return f"{{\n\t{self.brightness_level=},\n\t{self.brightness_range=},\n\t{self.color_level=},\n\t{self.color_range=},\n\t{self.on=}\n}}"
+        return f"brightness_level={self.brightness_level},\nbrightness_range={self.brightness_range},\ncolor_level={self.color_level},\ncolor_range={self.color_range},\non={self.on}"
 
     def change_brightness(self, n: int):
         if self.on:
             self.brightness_level += n
+            if self.brightness_level < 0:
+                self.brightness_level = 0
 
     def change_color(self, n: int):
         if self.on:
@@ -39,7 +41,8 @@ class BilresaController:
         self.down_pin = Pin(button_down_pin, Pin.IN)
 
         self.normal_press_duration = 100
-        self.brightness_change_press_duration = 500
+        self.brightness_change_press_duration = 1100
+        self.brightness_change_rate = 220
         self.on_off_state_change_multiplier = 10
 
         self.up_pin.irq(self._handle_up_irq, Pin.IRQ_FALLING | Pin.IRQ_RISING)
@@ -50,12 +53,11 @@ class BilresaController:
 
         self._already_pressed_once = False
 
-        if not lights_status:
-            self.lights_status = LightsStatus(0, range(0, 999), 0, range(0, 999)) # Set an "infinitely" big celling for the range so it can be calibrated
-            self.calibrate()
-        else:
+        if lights_status:
             self.lights_status = lights_status
-            self.calibrate(False, False)
+
+        else:
+            self.lights_status = LightsStatus(0, range(0, 99), 0, range(0, 99)) # Has to be calibrated
 
     def _handle_up_irq(self, pin):
         if pin.value() == 0:
@@ -80,7 +82,7 @@ class BilresaController:
 
         if diff >= self.brightness_change_press_duration:
             # Long press
-            self.lights_status.change_brightness(int(diff / self.brightness_change_press_duration))
+            self.lights_status.change_brightness(int((diff - self.brightness_change_press_duration) / self.brightness_change_rate))
             return
 
         if self._already_pressed_once:
@@ -104,7 +106,7 @@ class BilresaController:
 
         if diff >= self.brightness_change_press_duration:
             # Long press
-            self.lights_status.change_brightness(-int(diff / self.brightness_change_press_duration))
+            self.lights_status.change_brightness(-int((diff - self.brightness_change_press_duration) / self.brightness_change_rate))
             return
 
         if self._already_pressed_once:
@@ -123,75 +125,6 @@ class BilresaController:
 
         Timer().init(mode=Timer.ONE_SHOT, period=self.normal_press_duration * self.on_off_state_change_multiplier, callback=try_single_press)
 
-    def calibrate(self, do_set_brightness_range: bool = True, do_set_color_range: bool = True) -> LightsStatus:
-        return self.lights_status
-
-        i = 1
-        def next_step(i):
-            print(f"\033[0;36m={i}===============================================\033[0m")
-            return i + 1
-
-        def pause():
-            input("\033[0;90mPress enter to continue...\033[0m")
-
-        print("\033[1m[Follow the instructions start the calibration]\033[0m")
-        i = next_step(i)
-        print("Please turn the lights on, then set them to the lowest brightness setting and the warmest color setting (the light should be yellow / orange).")
-        pause()
-
-        self.lights_status.brightness_level = 0
-        self.lights_status.color_level = 0
-
-        if do_set_brightness_range:
-            i = next_step(i)
-            print("\033[1m[Calibrating brightness range]\033[0m")
-            print("Please change the brightness until your desired minimum brightness is reached.")
-            pause()
-
-            brightness_range_bottom = self.lights_status.brightness_level
-
-            print("Please change the brigtness until your desired maximum brightness is reached.")
-            pause()
-
-            brightness_range_top = self.lights_status.brightness_level
-
-            if brightness_range_bottom > brightness_range_top:
-                print("\033[0;33mWarning: You have set your maximum brigtness bellow your minimum brightness, swapping max and min.\033[0m")
-                brightness_range_top, brightness_range_bottom = brightness_range_bottom, brightness_range_top
-
-            self.lights_status.brightness_range = range(brightness_range_bottom, brightness_range_top)
-
-            print("\033[0;32mSuccessfully calibrated brigtness range, setting brightness to the new minimum.\033[0m")
-
-            for i in range(self.lights_status.brightness_range[-1] - self.lights_status.brightness_range[0]):
-                self.brightness_down()
-
-        if do_set_color_range:
-            i = next_step(i)
-            print("\033[1m[Calibrating warmth range]\033[0m")
-            print("Please change the warmth until your desired warmest color is reached.")
-            pause()
-
-            color_range_bottom = self.lights_status.color_level
-
-            print("Please change the warmth until your desired coldest color is reached.")
-            pause()
-
-            color_range_top = self.lights_status.color_level
-
-            if color_range_bottom > color_range_top:
-                print("\033[0;33mWarning: You have set your maximum warmth bellow your minimum warmth, swapping max and min.\033[0m")
-                color_range_top, color_range_bottom = color_range_bottom, color_range_top
-
-            self.lights_status.color_range = range(color_range_bottom, color_range_top)
-
-            print("\033[0;32mSuccessfully calibrated warmth range, setting warmth to the new minimum.\033[0m")
-
-            for i in range(self.lights_status.color_range[-1] - self.lights_status.color_range[0]):
-                self.warmth_down()
-
-        return self.lights_status
-
     def on(self) -> None:
         gpio_send_press(self.up_pin, self.normal_press_duration)
         time.sleep_ms(self.normal_press_duration * (self.on_off_state_change_multiplier - 1))
@@ -200,11 +133,17 @@ class BilresaController:
         gpio_send_press(self.down_pin, self.normal_press_duration)
         time.sleep_ms(self.normal_press_duration * (self.on_off_state_change_multiplier - 1))
 
-    def brightness_up(self) -> None:
-        gpio_send_press(self.up_pin, self.brightness_change_press_duration)
+    def brightness_up(self, amount: float = 1) -> None:
+        gpio_send_press(self.up_pin, int(self.brightness_change_press_duration + self.brightness_change_rate * amount))
 
-    def brightness_down(self) -> None:
-        gpio_send_press(self.down_pin, self.brightness_change_press_duration)
+    def brightness_down(self, amount: float = 1) -> None:
+        gpio_send_press(self.down_pin, int(self.brightness_change_press_duration + self.brightness_change_rate * amount))
+
+    def change_brightness(self, amount: float) -> None:
+        if (amount < 0):
+            self.brightness_down(abs(amount))
+        else:
+            self.brightness_up(amount)
 
     def warmth_up(self) -> None:
         gpio_send_press(self.up_pin, self.normal_press_duration)
@@ -213,3 +152,12 @@ class BilresaController:
     def warmth_down(self) -> None:
         gpio_send_press(self.down_pin, self.normal_press_duration)
         gpio_send_press(self.down_pin, self.normal_press_duration)
+
+    def change_warmth(self, amount: int) -> None:
+        if (amount < 0):
+            for _ in range(abs(amount)):
+                self.warmth_down()
+
+        else:
+            for _ in range(amount):
+                self.warmth_up()

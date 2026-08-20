@@ -1,6 +1,6 @@
 gpio_up=18
 gpio_down=17
-brigtness_range=0,0
+brightness_range=0,0
 color_range=0,0
 ssid=SSID
 password=PASSWD

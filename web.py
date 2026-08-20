@@ -2,6 +2,7 @@ import socket
 import time
 import network
 import errno
+import uasyncio
 
 class Route:
     def __init__(self, path: str, methods: list[str], function, *function_args) -> None:
@@ -46,7 +47,7 @@ class Web:
 
         return inner
 
-    def serve(self, host: str, port: int):
+    async def serve(self, host: str, port: int):
         wlan = network.WLAN(network.STA_IF)
 
         def connect_to_wifi(wifi_config: WifiConfig | None) -> str:
@@ -125,4 +126,4 @@ class Web:
             else:
                 connect_to_wifi(self.wifi_config)
 
-            time.sleep(0.1)
+            await uasyncio.sleep(0.1)
