@@ -3,6 +3,9 @@ import time
 import network
 import errno
 import uasyncio
+import machine
+import utime
+import gc
 
 class Route:
     def __init__(self, path: str, methods: list[str], function, *function_args) -> None:
@@ -51,6 +54,12 @@ class Web:
         wlan = network.WLAN(network.STA_IF)
 
         def connect_to_wifi(wifi_config: WifiConfig | None) -> str:
+            gc.collect()
+
+            led = machine.Pin("LED", machine.Pin.OUT)
+
+            led.on()
+
             if not wifi_config:
                 return host
 
@@ -63,7 +72,14 @@ class Web:
             while not wlan.isconnected():
                 if wait == 0:
                     if raise_on_failure:
-                        raise ConnectionError(f"Cannot connect to wifi network with ssid='{ssid}' and password='{password}'.")
+                        print(f"Cannot connect to wifi network with ssid='{ssid}' and password='{password}'.")
+
+                        for _ in range(2):
+                            led.off()
+                            utime.sleep_ms(500)
+                            led.on()
+
+                        return connect_to_wifi(wifi_config)
 
                     break
 
@@ -71,6 +87,9 @@ class Web:
                 time.sleep(1)
 
             status = wlan.ifconfig()
+
+            led.off()
+
             return status[0]
 
         ip = connect_to_wifi(self.wifi_config)

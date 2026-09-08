@@ -3,9 +3,12 @@ from web import Web, WifiConfig
 from weather import get_weather
 import uasyncio
 import machine
+import utime
 
 led = machine.Pin("LED", machine.Pin.OUT)
 led.on()
+utime.sleep_ms(500)
+led.off()
 
 with open(".config", "r") as f:
     config = dict([i.split("=") for i in f.read().splitlines()])
@@ -21,7 +24,14 @@ bilresa.brightness_down(20) # Ensure brightness is 0
 bilresa.lights_status.brightness_level = 0
 print("Please set the warmth to the warmest tone.") # Assuming warmth is the warmest
 
-led.off()
+for _ in range(10):
+    led.on()
+
+    utime.sleep_ms(500)
+
+    led.off()
+
+    utime.sleep_ms(500)
 
 async def update_lights():
     w = get_weather()
@@ -40,7 +50,7 @@ async def update_lights():
     elif bilresa.lights_status.color_level == 0:
         bilresa.change_warmth(1)
 
-    await uasyncio.sleep(300)
+    await uasyncio.sleep(60)
 
 @app.route('/status')
 def status():
@@ -54,6 +64,14 @@ def on():
 @app.route('/off')
 def off():
     bilresa.off()
+    return 'Ok', 200, 'text/json'
+
+@app.route('/toggle')
+def toggle():
+    if bilresa.lights_status.on:
+        bilresa.off()
+    else:
+        bilresa.on()
     return 'Ok', 200, 'text/json'
 
 @app.route('/brightness-up')
