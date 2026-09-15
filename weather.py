@@ -3,6 +3,7 @@ import gc
 import ujson
 import utime
 from math import cos, pi
+from log import log
 
 class WeatherData:
     def __init__(self, darkness: float, is_rain: bool) -> None:
@@ -86,8 +87,12 @@ def _get_weather_arso(url) -> WeatherData:
     if "dež" in today['clouds_shortText']:
         weather_data.is_rain = True
 
+    log(f"Got weather data:\n{weather_data.darkness=},\n{weather_data.is_rain=}\n")
+
     return weather_data
 
 def get_weather() -> WeatherData:
+    log("Getting weather data.")
+
     url = "https://vreme.arso.gov.si/api/1.0/location/?lang=sl&location=Ljubljana"
     return _get_weather_arso(url)

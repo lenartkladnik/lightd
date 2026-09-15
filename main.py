@@ -4,6 +4,7 @@ from weather import get_weather
 import uasyncio
 import machine
 import utime
+from log import log
 
 led = machine.Pin("LED", machine.Pin.OUT)
 led.on()
@@ -22,7 +23,7 @@ app = Web(wifi_conf)
 
 bilresa.brightness_down(20) # Ensure brightness is 0
 bilresa.lights_status.brightness_level = 0
-print("Please set the warmth to the warmest tone.") # Assuming warmth is the warmest
+log("Please set the warmth to the warmest tone.") # Assuming warmth is the warmest
 
 for _ in range(10):
     led.on()
@@ -54,7 +55,11 @@ async def update_lights():
 
 @app.route('/status')
 def status():
-    return str(bilresa.lights_status), 200, 'text/json'
+    return str(bilresa.lights_status), 200, 'text'
+
+@app.route('/logs')
+def logs():
+    return open("log", "r").read(), 200, 'text'
 
 @app.route('/on')
 def on():

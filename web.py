@@ -6,6 +6,7 @@ import uasyncio
 import machine
 import utime
 import gc
+from log import log
 
 class Route:
     def __init__(self, path: str, methods: list[str], function, *function_args) -> None:
@@ -70,6 +71,7 @@ class Web:
 
             wait = timeout
             while not wlan.isconnected():
+                log(f"Trying to connect to wifi (attempt {timeout - wait + 1}).")
                 if wait == 0:
                     if raise_on_failure:
                         print(f"Cannot connect to wifi network with ssid='{ssid}' and password='{password}'.")
@@ -90,6 +92,11 @@ class Web:
 
             led.off()
 
+            if status[0]:
+                log("Connected to wifi.")
+            else:
+                log("Failed to connect to wifi.")
+
             return status[0]
 
         ip = connect_to_wifi(self.wifi_config)
@@ -101,15 +108,15 @@ class Web:
         s.bind(addr)
         s.listen(1)
 
-        print(f'Web server running on {host}:{port}')
-        print(f'        http://{ip}:{port}')
+        log(f'Web server running on {host}:{port}')
+        log(f'        http://{ip}:{port}')
 
         while True:
             if wlan.isconnected():
                 try:
                     conn, addr = s.accept()
                     conn.settimeout(2.0)
-                    print(f'Connection from {addr[0]}:{addr[1]}')
+                    log(f'Connection from {addr[0]}:{addr[1]}')
 
                     def serve_response(payload: str, code: str = '200 OK', content_type: str = 'text/html'):
                         conn.send(f'HTTP/1.0 {code}\r\nContent-type: {content_type}\r\n\r\n'.encode())
@@ -118,7 +125,7 @@ class Web:
 
                     raw_req = conn.recv(1024)
                     request = Request(raw_req)
-                    print(f'[{addr[0]}] Request: {raw_req}')
+                    log(f'[{addr[0]}] Request: {raw_req}')
                     for route in self._routes:
                         if route.check(request):
                             r = route.function(*route.function_args)
@@ -137,10 +144,10 @@ class Web:
                     if e.args[0] == errno.EAGAIN:
                         pass
                     else:
-                        print(f"Failed to serve (socket error): {e}")
+                        log(f"Failed to serve (socket error): {e}")
 
                 except Exception as e:
-                    print(f"Failed to serve: {e}")
+                    log(f"Failed to serve: {e}")
 
             else:
                 connect_to_wifi(self.wifi_config)
