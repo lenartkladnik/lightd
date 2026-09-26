@@ -1,4 +1,4 @@
-import requests
+import urequests
 import gc
 import ujson
 import utime
@@ -37,33 +37,62 @@ def _get_weather_arso(url) -> WeatherData:
     weather_data = WeatherData(False, False)
 
     gc.collect()
-    resp = requests.get(url)
-    text = resp.text
+    resp = urequests.get(url)
+    gc.collect()
+
+    obs_text = ""
+    found_start = False
+    depth = 0
+    buffer = ""
+    chunk_size = 64
+
+    while True:
+        chunk = resp.raw.read(chunk_size)
+        if not chunk:
+            break
+
+        try:
+            buffer += chunk.decode()
+        except UnicodeError:
+            pass
+
+        if not found_start:
+            idx = buffer.find('"observation"')
+            if idx != -1:
+                idx = buffer.find('{', idx)
+                if idx != -1:
+                    found_start = True
+                    buffer = buffer[idx:]
+
+
+            else:
+                buffer = buffer[buffer.rfind('}'):]
+                gc.collect()
+
+        if found_start:
+            for char in buffer:
+                obs_text += char
+                if char == '{':
+                    depth += 1
+                elif char == '}':
+                    depth -= 1
+                    if depth == 0:
+                        break
+
+            if depth == 0:
+                break
+
+            buffer = ""
+            gc.collect()
+
     resp.close()
     gc.collect()
 
-    start = text.find('"observation"')
-    start = text.find('{', start)
-    text = text[start:]
-    gc.collect()
-    depth = 0
-    end = start
-    for i in range(len(text)):
-        if text[i] == '{':
-            depth += 1
-        elif text[i] == '}':
-            depth -= 1
-            if depth == 0:
-                end = i + 1
-                break
-    obs_text = text[:end]
-    del text
-    gc.collect()
-
     obs = ujson.loads(obs_text)
+    del obs_text
+    gc.collect()
 
     today = obs['features'][0]['properties']['days'][0]
-
     del obs
     gc.collect()
 
@@ -79,10 +108,9 @@ def _get_weather_arso(url) -> WeatherData:
     del sunrise
     del sunset
     del mid_day
+    gc.collect()
 
     today = today['timeline'][0]
-
-    gc.collect()
 
     if "dež" in today['clouds_shortText']:
         weather_data.is_rain = True
